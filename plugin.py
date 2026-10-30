@@ -1,6 +1,6 @@
 """主动搭话插件：随机间隔主动开口，优先接原话题，可 @ 人并查人物画像。
 
-配置由 WebUI 渲染（每项都有中文说明），改完保存即生效，无需重启。
+配置由 WebUI 渲染（字段标题与说明均为中文），改完保存即生效，无需重启。
 """
 
 from __future__ import annotations
@@ -9,7 +9,7 @@ import asyncio
 import random
 import time
 from datetime import datetime
-from typing import Any, ClassVar, List, Optional
+from typing import Any, List, Optional
 
 from maibot_sdk import HookHandler, MaiBotPlugin, PluginConfigBase
 from maibot_sdk.types import ErrorPolicy, HookMode, HookOrder
@@ -17,55 +17,90 @@ from pydantic import Field
 
 
 class ProactiveSettings(PluginConfigBase):
-    """[plugin] 配置节。每项 description 会显示在 WebUI 配置页。"""
+    """[plugin] 配置节。label 是网页上显示的字段名，description 是下面的说明。"""
 
     __ui_label__ = "主动搭话"
 
-    config_version: str = Field(default="1.0.0", description="配置版本，插件升级时用于迁移，一般不用改。")
+    config_version: str = Field(
+        default="1.0.0",
+        json_schema_extra={"label": "配置版本"},
+        description="插件升级时用于迁移配置，一般不用改。",
+    )
 
-    enabled: bool = Field(default=True, description="总开关。关闭后插件不再主动说话。")
+    enabled: bool = Field(
+        default=True,
+        json_schema_extra={"label": "启用主动搭话"},
+        description="总开关。关闭后只在被 @ 或点名时回应，不会自己找话聊。",
+    )
 
     target_groups: List[str] = Field(
-        default_factory=list,
-        description="生效的群号列表。留空 = 所有群聊都生效；只填想让它主动说话的群更安全。",
+        default_factory=lambda: ["902606839", "1077122131"],
+        json_schema_extra={"label": "生效群号"},
+        description="只在这些群里主动开口。留空 = 所有群；当前已填 ZNR 群与杰林 Quest3 群（不含黑迷）。",
     )
 
     min_interval_minutes: float = Field(
-        default=25.0, ge=1.0, description="两次判定的最小间隔（分钟）。实际间隔在 min~max 之间随机。",
+        default=25.0,
+        ge=1.0,
+        json_schema_extra={"label": "最小间隔（分钟）"},
+        description="两次判定之间的最短等待时间。实际间隔在最小~最大之间随机取。",
     )
+
     max_interval_minutes: float = Field(
-        default=75.0, ge=1.0, description="两次判定的最大间隔（分钟）。调小会明显更活跃。",
+        default=75.0,
+        ge=1.0,
+        json_schema_extra={"label": "最大间隔（分钟）"},
+        description="两次判定之间的最长等待时间。调小会明显更活跃。",
     )
 
     probability: float = Field(
-        default=0.45, ge=0.0, le=1.0,
-        description="每次判定时真正开口的概率（0~1）。0.45 表示约一半的判定会说话，其余跳过。",
+        default=0.45,
+        ge=0.0,
+        le=1.0,
+        json_schema_extra={"label": "开口概率"},
+        description="每次判定时真正开口的概率。0.45 表示约一半的判定会说话，其余跳过。",
     )
 
     quiet_minutes: float = Field(
-        default=12.0, ge=0.0,
-        description="群里安静满多少分钟才允许主动开口。设为 0 表示不检查闲聊状态（容易插嘴）。",
+        default=12.0,
+        ge=0.0,
+        json_schema_extra={"label": "静默阈值（分钟）"},
+        description="群里安静满多少分钟才允许主动开口。设为 0 表示不检查（容易插嘴）。",
     )
 
     active_hours_start: int = Field(
-        default=8, ge=0, le=23, description="活跃时段开始（0~23 点）。不在时段内不主动说话。",
+        default=8,
+        ge=0,
+        le=23,
+        json_schema_extra={"label": "活跃时段-开始（点）"},
+        description="只在此时刻之后主动说话。",
     )
+
     active_hours_end: int = Field(
-        default=23, ge=0, le=24, description="活跃时段结束（0~24 点，可填 24 表示到当天结束）。",
+        default=23,
+        ge=0,
+        le=24,
+        json_schema_extra={"label": "活跃时段-结束（点）"},
+        description="到此时刻前停止主动说话。填 24 表示到当天结束。",
     )
 
     max_per_day: int = Field(
-        default=5, ge=0, description="每天主动开口的上限次数。0 表示禁止。",
+        default=5,
+        ge=0,
+        json_schema_extra={"label": "每日上限（次）"},
+        description="每天最多主动开口几次。0 表示禁止。",
     )
 
     allow_at: bool = Field(
         default=True,
-        description="允许主动 @ 某个人。关闭后只发普通消息，不会点名。",
+        json_schema_extra={"label": "允许 @ 人"},
+        description="允许主动点名 @ 某个群友。关闭后只发普通消息。",
     )
 
     recall_profile: bool = Field(
         default=True,
-        description="要求它先查人物画像（query_person_profile）和回顾历史对话，再决定说什么、@ 谁。关闭可省一次调用但会显得没记性。",
+        json_schema_extra={"label": "先查人物画像"},
+        description="开口前先查对方画像和历史对话，优先找聊过的人。关闭可省一次模型调用，但会显得没记性。",
     )
 
     intent: str = Field(
@@ -78,10 +113,8 @@ class ProactiveSettings(PluginConfigBase):
             "优先找跟你搭过话的人，别 @ 完全没交流过的；"
             "⑤ 整段话要短，一到两句，别说教、别像客服、别报菜单。"
         ),
-        description=(
-            "主动开口时给模型的指令。决定它怎么选话题、怎么选人、用什么语气。"
-            "默认已包含「回顾历史→接原话题→没有就问候撒娇→可 @ 聊过的人」。"
-        ),
+        json_schema_extra={"label": "开口指令"},
+        description="主动开口时给模型的指令。决定它怎么选话题、怎么选人、用什么语气，可自由修改。",
     )
 
 
@@ -103,11 +136,13 @@ class ProactiveChatPlugin(MaiBotPlugin):
 
     async def on_load(self) -> None:
         self._stopping = False
+        cfg = self._settings()
         self._task = asyncio.create_task(self._loop())
-        self.ctx.logger.info("主动搭话插件已启动（间隔 %.0f~%.0f 分钟，概率 %.2f）",
-                             self._settings().min_interval_minutes,
-                             self._settings().max_interval_minutes,
-                             self._settings().probability)
+        self.ctx.logger.info(
+            "主动搭话插件已启动：enabled=%s 群=%s 间隔=%s~%s 分钟 概率=%s",
+            cfg.enabled, cfg.target_groups or "全部", cfg.min_interval_minutes,
+            cfg.max_interval_minutes, cfg.probability,
+        )
 
     async def on_unload(self) -> None:
         self._stopping = True
@@ -119,6 +154,18 @@ class ProactiveChatPlugin(MaiBotPlugin):
                 pass
             self._task = None
         self.ctx.logger.info("主动搭话插件已停止")
+
+    async def on_config_update(self, scope: str, config_data: dict[str, Any], version: str) -> None:
+        """WebUI 保存配置后回调：只记日志，新配置在下一轮判定时自动生效。"""
+        try:
+            cfg = self._settings()
+            self.ctx.logger.info(
+                "主动搭话配置已更新：enabled=%s 群=%s 间隔=%s~%s 概率=%s 静默=%s 每日上限=%s",
+                cfg.enabled, cfg.target_groups or "全部", cfg.min_interval_minutes,
+                cfg.max_interval_minutes, cfg.probability, cfg.quiet_minutes, cfg.max_per_day,
+            )
+        except Exception:
+            pass
 
     @HookHandler(
         "chat.receive.before_process",
@@ -149,18 +196,6 @@ class ProactiveChatPlugin(MaiBotPlugin):
         except Exception:
             pass
 
-
-    async def on_config_update(self, scope: str, config_data: dict[str, Any], version: str) -> None:
-        """WebUI 保存配置后回调：只记日志，新配置在下一轮判定时自动生效。"""
-        try:
-            cfg = self._settings()
-            self.ctx.logger.info(
-                "主动搭话配置已更新：scope=%s version=%s enabled=%s 间隔=%.0f~%.0f 概率=%.2f 静默=%.0f 每日上限=%d",
-                scope, version, cfg.enabled, cfg.min_interval_minutes,
-                cfg.max_interval_minutes, cfg.probability, cfg.quiet_minutes, cfg.max_per_day,
-            )
-        except Exception:
-            pass
     async def _loop(self) -> None:
         await asyncio.sleep(60)
         while not self._stopping:
@@ -211,7 +246,7 @@ class ProactiveChatPlugin(MaiBotPlugin):
 
         streams = await self._target_streams(cfg)
         if not streams:
-            self.ctx.logger.debug("主动搭话：没有可用群聊流")
+            self.ctx.logger.debug("主动搭话：没有可用的目标群")
             return
         session_id, group_id = random.choice(streams)
 
