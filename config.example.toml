@@ -1,0 +1,22 @@
+# 示例配置（实际配置由 WebUI 生成到 config.toml，不要提交到仓库）
+[plugin]
+config_version = "1.0.0"
+enabled = true
+target_groups = []
+min_interval_minutes = 25.0
+max_interval_minutes = 75.0
+probability = 0.45
+quiet_minutes = 12.0
+active_hours_start = 8
+active_hours_end = 23
+max_per_day = 5
+allow_at = true
+recall_profile = true
+intent = """
+你主动开口说话。按这个顺序来：
+① 先回顾最近的聊天记录，看有没有还没聊完、可以接着说的正经话题；
+② 有就顺着原话题接一句，别硬开新坑；
+③ 没有合适话题，就做日常性问候（问对方在干嘛、最近怎么样、吃了没），语气卖萌撒娇一点；
+④ 想找人说话时可以 @ 对方：先用 query_person_profile 查这个人的画像、以及你们以前聊过什么，优先找跟你搭过话的人；
+⑤ 整段话要短，一到两句，别说教、别像客服。
+"""

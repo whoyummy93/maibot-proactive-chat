@@ -1,0 +1,36 @@
+{
+  "manifest_version": 2,
+  "id": "github.whoyummy93.maibot-proactive-chat",
+  "plugin_type": "chat",
+  "version": "1.0.0",
+  "name": "主动搭话插件",
+  "description": "让麦麦随机主动开口：优先接原有话题，没有就日常问候、卖萌撒娇；可 @ 聊过的群友（会先查人物画像与历史对话）。",
+  "author": {
+    "name": "whoyummy93",
+    "url": "https://github.com/whoyummy93"
+  },
+  "license": "MIT",
+  "urls": {
+    "repository": "https://github.com/whoyummy93/maibot-proactive-chat",
+    "homepage": "https://github.com/whoyummy93/maibot-proactive-chat",
+    "documentation": "https://github.com/whoyummy93/maibot-proactive-chat/blob/main/README.md",
+    "issues": "https://github.com/whoyummy93/maibot-proactive-chat/issues"
+  },
+  "host_application": {
+    "min_version": "1.3.18",
+    "max_version": "1.9.99"
+  },
+  "sdk": {
+    "min_version": "1.0.0",
+    "max_version": "1.99.99"
+  },
+  "dependencies": [],
+  "capabilities": [
+    "chat.get_group_streams",
+    "maisaka.proactive.trigger"
+  ],
+  "i18n": {
+    "default_locale": "zh-CN",
+    "supported_locales": ["zh-CN"]
+  }
+}
